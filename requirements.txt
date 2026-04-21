@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+pandas
+numpy
+statsmodels
+scikit-learn
+streamlit
+plotly
+pydantic
+pyyaml
+pytest
+joblib
+python-dotenv

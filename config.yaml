@@ -1,0 +1,21 @@
+app_name: "Quantitative Treasury Analytics Platform"
+version: "1.0.0"
+log_level: "INFO"
+low_liquidity_threshold: 1.0
+
+data:
+  raw_path: "data/raw/treasury_daily.csv"
+  staging_path: "data/staging/treasury_staging.csv"
+  curated_path: "data/curated/treasury_curated.csv"
+  outputs_dir: "data/outputs"
+  generate_if_missing: true
+  synthetic_days: 730
+
+forecast:
+  target_column: "balance"
+  horizon_days: 14
+  arima_order: [2, 1, 2]
+  train_ratio: 0.8
+  benchmark_models: ["naive_last", "linear_trend"]
+  backtest_windows: 4
+  backtest_test_size: 14
