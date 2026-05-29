@@ -11,3 +11,7 @@ pyyaml
 pytest
 joblib
 python-dotenv
+mlflow>=2.13.0
+pandera>=0.19.0
+apache-airflow>=2.9.0
+ruff

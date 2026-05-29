@@ -1,198 +1,159 @@
-# Quantitative Treasury Analytics Platform
+# Treasury Analytics Platform
 
-Production-grade treasury analytics platform for liquidity monitoring, cashflow analytics, and time-series forecasting.
-
-## Why This Project
-
-Treasury teams need reliable visibility into liquidity, cash position, and near-term balances. This project demonstrates an end-to-end implementation of that problem:
-
-- data ingestion and quality controls
-- layered analytics pipeline (`RAW -> STAGING -> CURATED`)
-- time-series forecasting using ARIMA
-- benchmark model registry and rolling backtests
-- API delivery and dashboard consumption
-- Dockerized deployment and automated tests
-
-## Core Features
-
-### 1) Data Engineering Pipeline
-- Ingests treasury daily records from configurable CSV paths.
-- Auto-generates realistic synthetic 2-year daily treasury data if source file is missing.
-- Validates schema, types, missing values, duplicates, and date ordering.
-- Writes layered outputs:
-  - `data/raw/treasury_daily.csv`
-  - `data/staging/treasury_staging.csv`
-  - `data/curated/treasury_curated.csv`
-
-### 2) Treasury Analytics
-- Net cash flow and rolling trend metrics.
-- Liquidity stress proxy and low-liquidity period detection.
-- Volatility and peak usage analysis for treasury reporting.
-
-### 3) Forecasting (ARIMA + Model Registry)
-- ARIMA forecasting for treasury balance (`statsmodels`).
-- Metrics: RMSE, MAE, MAPE.
-- Benchmark models:
-  - `naive_last`
-  - `linear_trend`
-- Champion model selection on:
-  - single time-based holdout split
-  - rolling-window backtesting
-
-### 4) Serving & Visualization
-- FastAPI endpoints for health, cashflow, summary, forecast, and pipeline run.
-- Streamlit dashboard with KPIs, trend charts, forecast view, volatility tracking, and filters.
+Production-grade treasury cashflow analytics system: RAW → STAGING → CURATED pipeline, ARIMA(2,1,2) forecasting with MLflow experiment tracking, Apache Airflow orchestration, Pandera data contracts, and a FastAPI + Streamlit serving layer.
 
 ## Architecture
 
-```text
-Data Source / Synthetic Generator
-        |
-        v
-RAW Layer (ingestion)
-        |
-        v
-STAGING Layer (validation + cleaning + schema normalization)
-        |
-        v
-CURATED Layer (feature engineering + model-ready signals)
-        |
-        +--> FastAPI endpoints (operational serving)
-        |
-        +--> ARIMA + benchmark registry + backtesting
-        |
-        +--> Streamlit dashboard (analytics UI)
+```
+CSV Source / Synthetic Generator (730-day daily series)
+        │
+        ▼
+┌─────────────────────────────────────────────┐
+│              Apache Airflow DAG             │
+│   ingest_and_validate → transform_features  │
+│         → train_and_forecast                │
+│   Schedule: 06:00 UTC daily │ SLA: 2h       │
+└────────────────────┬────────────────────────┘
+                     │
+        ┌────────────▼────────────┐
+        │     Data Pipeline       │
+        │  RAW → STAGING → CURATED│
+        │  Pandera schema contracts│
+        └────────────┬────────────┘
+                     │
+        ┌────────────▼────────────┐
+        │   Feature Engineering   │
+        │  Rolling stats · lags   │
+        │  Liquidity signals      │
+        └────────────┬────────────┘
+                     │
+        ┌────────────▼────────────┐
+        │  ARIMA(2,1,2) Forecaster│
+        │  MLflow experiment log  │
+        │  14-day horizon         │
+        └────────────┬────────────┘
+                     │
+        ┌────────────▼────────────┐
+        │  FastAPI + Streamlit    │
+        │  5 endpoints · KPI dash │
+        └─────────────────────────┘
 ```
 
 ## Tech Stack
 
-- **Language**: Python
-- **Data/Quant**: Pandas, NumPy, statsmodels, scikit-learn
-- **API**: FastAPI, Uvicorn, Pydantic
-- **Dashboard**: Streamlit, Plotly
-- **Config**: PyYAML
-- **Testing**: pytest
-- **Packaging/Runtime**: Docker, docker-compose
+| Layer | Technology |
+|---|---|
+| Orchestration | Apache Airflow 2.9 — daily DAG, 2-retry SLA enforcement |
+| Data Contracts | Pandera — typed schemas for RAW and CURATED layers |
+| Experiment Tracking | MLflow — param/metric logging, model artifact registry |
+| Data Pipeline | Pandas, NumPy — RAW → STAGING → CURATED |
+| Forecasting | statsmodels ARIMA, scikit-learn benchmarks, rolling backtests |
+| API | FastAPI, Uvicorn, Pydantic response schemas |
+| Dashboard | Streamlit, Plotly |
+| Config | PyYAML + Pydantic |
+| Testing | pytest — 7 test suites |
+| CI/CD | GitHub Actions — lint, test coverage, DAG import check |
+| Runtime | Docker, Docker Compose |
 
-## Project Structure
-
-```text
-treasury-analytics-platform/
-├── app/
-│   ├── api/                  # FastAPI routes
-│   ├── core/                 # config + logging
-│   ├── data/                 # loading, validation, preprocessing, synthetic generation
-│   ├── features/             # feature engineering
-│   ├── models/               # ARIMA, benchmarks, model registry, analytics
-│   ├── schemas/              # typed response contracts
-│   ├── services/             # orchestration and business logic
-│   └── utils/                # metrics helpers
-├── dashboard/                # Streamlit app
-├── config/                   # yaml configuration
-├── data/                     # raw/staging/curated/outputs artifacts
-├── sql/                      # dbt-style transformation references
-├── tests/                    # unit tests
-├── Dockerfile
-├── docker-compose.yml
-├── Makefile
-└── README.md
-```
-
-## Quick Start (Local)
+## Quick Start
 
 ```bash
-python -m venv .venv
+git clone https://github.com/pulipakav1/analytics_platform.git
+cd treasury-analytics-platform
+
+cp .env.example .env
+docker-compose up --build
+# API docs  →  http://localhost:8000/docs
+# Dashboard →  http://localhost:8501
+# MLflow UI →  mlflow ui (port 5000)
 ```
 
-Activate environment:
-- Windows PowerShell: `.venv\Scripts\Activate.ps1`
-- macOS/Linux: `source .venv/bin/activate`
-
-Install dependencies:
+**Local Python:**
 
 ```bash
+python -m venv .venv && source .venv/bin/activate   # or .venv\Scripts\Activate.ps1 on Windows
 pip install -r requirements.txt
+
+make pipeline     # RAW → STAGING → CURATED
+make api          # FastAPI at :8000
+make dashboard    # Streamlit at :8501
+make test         # pytest
 ```
 
-Run tests:
+## Data Pipeline
 
-```bash
-python -m pytest -q
+| Stage | What happens |
+|---|---|
+| **RAW** | CSV ingestion or 730-day synthetic fallback; Pandera schema contract enforced |
+| **STAGING** | Type casting, duplicate removal, date ordering, cash position calculation |
+| **CURATED** | 22-feature engineering: rolling stats (7/30-day), lags, drawdown, liquidity stress, temporal flags |
+
+## Airflow DAG — `treasury_analytics_pipeline`
+
+```
+ingest_and_validate  →  transform_features  →  train_and_forecast
+   • schema check         • run_pipeline()        • ARIMA fit
+   • XCom: raw_count      • curated validation    • MLflow run logged
+   • 2 retries            • XCom: curated_count   • 14-day forecast saved
 ```
 
-Run pipeline:
+Runs at `0 6 * * *` (06:00 UTC). 2-hour SLA. 2 auto-retries per task.
 
-```bash
-python -c "from app.services.pipeline_service import run_pipeline; print(run_pipeline())"
-```
+## Forecasting & MLflow
 
-Run API:
+Each ARIMA evaluation run logs to the `treasury-arima-forecasting` experiment:
 
-```bash
-uvicorn app.main:app --reload --port 8000
-```
+- **Parameters:** p, d, q orders; train/test sizes; date range
+- **Metrics:** RMSE, MAE, MAPE per holdout run
+- **Artifacts:** serialized model (joblib)
+- **Tags:** `model_type=ARIMA`, `domain=treasury-cashflow`
 
-Run dashboard (separate terminal):
-
-```bash
-streamlit run dashboard/streamlit_app.py
-```
+Compare runs: `mlflow ui` → `http://localhost:5000`
 
 ## API Endpoints
 
-- `GET /health`
-- `GET /cashflow?limit=120`
-- `GET /summary`
-- `GET /forecast`
-- `POST /run-pipeline`
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/health` | Liveness check |
+| `GET` | `/cashflow?limit=120` | Net cashflow time series |
+| `GET` | `/summary` | Liquidity KPIs — stress, volatility, peak usage |
+| `GET` | `/forecast` | ARIMA forecast + benchmark leaderboard + 14-day predictions |
+| `POST` | `/run-pipeline` | Trigger full pipeline run |
 
-Docs: `http://localhost:8000/docs`
+## CI/CD
 
-## Docker
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push:
 
-Build and run all services:
+1. **Lint** — ruff checks `app/`, `tests/`, `dags/`
+2. **Pandera validation** — imports schema contracts to catch drift early
+3. **pytest** — full suite with coverage report uploaded as artifact
+4. **DAG import check** — validates Airflow DAG parses without error
 
-```bash
-docker-compose up --build
+## Project Structure
+
 ```
-
-Services:
-- API: `http://localhost:8000/docs`
-- Dashboard: `http://localhost:8501`
-
-## Forecasting Methodology
-
-1. Build daily curated series for target (default: `balance`).
-2. Time-based train/test split for realistic forward validation.
-3. Evaluate ARIMA on holdout (`RMSE`, `MAE`, `MAPE`).
-4. Benchmark ARIMA vs `naive_last` and `linear_trend`.
-5. Compute champion for holdout split (`champion_model`).
-6. Run rolling-window backtests and compute aggregate champion (`backtest_champion_model`).
-7. Generate future 14-day ARIMA forecast and persist artifacts.
-
-## Example Forecast Response Signals
-
-The `/forecast` endpoint returns:
-- ARIMA metrics (`metrics`)
-- benchmark leaderboard (`benchmark_metrics`)
-- single-split winner (`champion_model`)
-- rolling backtest aggregates (`backtest_metrics`)
-- robust winner (`backtest_champion_model`)
-- future predictions (`forecast_records`)
-
-## Testing Coverage
-
-Current test suite covers:
-- data pipeline creation and curated loading
-- feature engineering outputs
-- ARIMA forecasting behavior
-- model registry and benchmark evaluation
-- rolling-backtest response fields
-- treasury summary analytics
-
-## Roadmap
-
-- PostgreSQL persistence + SQLAlchemy data models
-- scheduled orchestration (Airflow or APScheduler)
-- CI/CD pipeline and cloud deployment templates
-- alerting channel integration for liquidity risk thresholds
+treasury-analytics-platform/
+├── app/
+│   ├── api/                        ← 5 FastAPI route modules
+│   ├── core/                       ← config (Pydantic + YAML), structured logger
+│   ├── data/
+│   │   ├── loader.py               ← CSV ingestion + synthetic fallback
+│   │   ├── validator.py            ← schema, type, duplicate, ordering checks
+│   │   ├── preprocessing.py        ← STAGING transforms
+│   │   ├── schema.py               ← Pandera RAW + CURATED contracts
+│   │   └── synthetic_data.py       ← 730-day realistic data generator
+│   ├── features/feature_engineering.py  ← 22-feature engineering
+│   ├── models/
+│   │   ├── arima_forecast.py       ← ARIMA + MLflow tracking
+│   │   └── summary_analytics.py   ← cashflow, stress, volatility KPIs
+│   └── services/                   ← pipeline + treasury orchestration
+├── dags/
+│   └── treasury_pipeline_dag.py   ← Airflow DAG (daily, SLA-enforced)
+├── dashboard/streamlit_app.py      ← Streamlit UI
+├── tests/                          ← 7 pytest suites
+├── .github/workflows/ci.yml        ← GitHub Actions CI
+├── config/config.yaml
+├── Dockerfile
+├── docker-compose.yml
+└── Makefile
+```

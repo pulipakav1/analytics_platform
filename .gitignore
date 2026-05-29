@@ -47,3 +47,11 @@ data/outputs/*
 
 # Logs
 *.log
+
+# MLflow experiment tracking
+mlruns/
+mlartifacts/
+
+# Claude Code
+.claude/
+CLAUDE.md
