@@ -4,14 +4,14 @@ import pandas as pd
 import pytest
 
 from app.data.preprocessing import to_staging_schema
-from app.data.synthetic_data import generate_synthetic_data
+from app.data.synthetic_data import generate_synthetic_treasury_data
 from app.data.validator import clean_and_validate
 from app.features.feature_engineering import build_features
 
 
 @pytest.fixture(scope="session")
 def raw_df() -> pd.DataFrame:
-    return generate_synthetic_data(n_days=200)
+    return generate_synthetic_treasury_data(days=200)
 
 
 @pytest.fixture(scope="session")
