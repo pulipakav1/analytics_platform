@@ -3,9 +3,9 @@
 import pandas as pd
 import pytest
 
+from app.data.preprocessing import to_staging_schema
 from app.data.synthetic_data import generate_synthetic_data
 from app.data.validator import clean_and_validate
-from app.data.preprocessing import to_staging_schema
 from app.features.feature_engineering import build_features
 
 

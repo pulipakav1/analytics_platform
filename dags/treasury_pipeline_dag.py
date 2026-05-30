@@ -22,8 +22,8 @@ def _ingest_and_validate(**context: dict) -> dict:
     sys.path.insert(0, "/opt/airflow/treasury-analytics-platform")
     from app.core.config import get_config
     from app.data.loader import load_raw_data
-    from app.data.validator import clean_and_validate
     from app.data.schema import RAW_SCHEMA
+    from app.data.validator import clean_and_validate
 
     config = get_config()
     raw = load_raw_data(config)
@@ -37,10 +37,11 @@ def _ingest_and_validate(**context: dict) -> dict:
 def _transform_features(**context: dict) -> dict:
     import sys
     sys.path.insert(0, "/opt/airflow/treasury-analytics-platform")
-    from app.services.pipeline_service import run_pipeline
-    from app.data.schema import CURATED_SCHEMA
     import pandas as pd
+
     from app.core.config import get_config
+    from app.data.schema import CURATED_SCHEMA
+    from app.services.pipeline_service import run_pipeline
 
     result = run_pipeline()
     config = get_config()
